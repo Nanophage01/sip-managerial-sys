@@ -42,6 +42,7 @@ export async function GET(request) {
     const adminPasswordHash = await bcrypt.hash("admin123", 10);
     const studentPasswordHash = await bcrypt.hash("student123", 10);
     const bobbyPasswordHash = await bcrypt.hash("bobby123", 10);
+    const teacherPasswordHash = await bcrypt.hash("teacher123", 10);
 
     const usersData = [
       {
@@ -63,6 +64,20 @@ export async function GET(request) {
         password: bobbyPasswordHash,
         role: "student",
         studentId: "ST-202601",
+      },
+      {
+        name: "Dr. Elizabeth Vance",
+        email: "evance@edumanage.com",
+        password: teacherPasswordHash,
+        role: "teacher",
+        teacherId: "TC-001",
+      },
+      {
+        name: "Mr. Arthur Pendelton",
+        email: "apendelton@edumanage.com",
+        password: teacherPasswordHash,
+        role: "teacher",
+        teacherId: "TC-002",
       },
     ];
     await User.insertMany(usersData);

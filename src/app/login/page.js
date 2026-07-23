@@ -6,7 +6,7 @@ import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [role, setRole] = useState("student"); // "student" | "admin"
+  const [portal, setPortal] = useState("student"); // "student" | "staff"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,17 +27,13 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, role }),
+        body: JSON.stringify({ email, password, portal }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        if (data.user.role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/student/dashboard");
-        }
+        router.push(data.redirect);
       } else {
         setError(data.error || "Authentication failed.");
       }
@@ -62,43 +58,43 @@ export default function LoginPage() {
             </span>
           </Link>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Sign in to your portal
+            Sign in to EduManage Pro
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Select your account type and enter your credentials
+            Enter your credentials to access your portal
           </p>
         </div>
 
         <div className="bg-white px-8 py-8 border border-gray-200 rounded-xl shadow-sm space-y-6">
-          {/* Role selector tabs */}
+          {/* Portal selector tabs */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
             <button
               type="button"
               onClick={() => {
-                setRole("student");
+                setPortal("student");
                 setError("");
               }}
               className={`rounded-md py-2 text-sm font-medium text-center transition-colors ${
-                role === "student"
+                portal === "student"
                   ? "bg-white text-primary shadow-sm"
                   : "text-gray-600 hover:text-primary"
               }`}
             >
-              Student Portal
+              Student
             </button>
             <button
               type="button"
               onClick={() => {
-                setRole("admin");
+                setPortal("staff");
                 setError("");
               }}
               className={`rounded-md py-2 text-sm font-medium text-center transition-colors ${
-                role === "admin"
+                portal === "staff"
                   ? "bg-white text-primary shadow-sm"
                   : "text-gray-600 hover:text-primary"
               }`}
             >
-              Admin Portal
+              Staff
             </button>
           </div>
 
@@ -121,11 +117,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={
-                  role === "admin"
-                    ? "admin@edumanage.com"
-                    : "student@edumanage.com"
-                }
+                placeholder="you@edumanage.com"
                 className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
@@ -165,15 +157,9 @@ export default function LoginPage() {
               disabled={isLoading}
               className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-white hover:bg-primary-light transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
             >
-              {isLoading ? "Signing in..." : `Sign in as ${role === "admin" ? "Admin" : "Student"}`}
+              {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          <div className="text-center text-xs text-gray-500 border-t border-gray-100 pt-4 space-y-1">
-            <p className="font-semibold text-gray-700">Default Demo Credentials:</p>
-            <p>Admin: <span className="font-mono text-gray-800">admin@edumanage.com</span> / <span className="font-mono text-gray-800">admin123</span></p>
-            <p>Student: <span className="font-mono text-gray-800">student@edumanage.com</span> / <span className="font-mono text-gray-800">student123</span></p>
-          </div>
         </div>
       </div>
     </div>
