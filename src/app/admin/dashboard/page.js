@@ -1,15 +1,49 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const [counts, setCounts] = useState({ students: 0, teachers: 0, courses: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const resStudents = await fetch("/api/students");
+        const students = await resStudents.json();
+        const resTeachers = await fetch("/api/teachers");
+        const teachers = await resTeachers.json();
+        const resCourses = await fetch("/api/courses");
+        const courses = await resCourses.json();
+
+        setCounts({
+          students: students.length || 0,
+          teachers: teachers.length || 0,
+          courses: courses.length || 0,
+        });
+      } catch (err) {
+        console.error("Failed to fetch admin metrics counts:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCounts();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm font-medium text-gray-500">
+        Loading admin dashboard...
+      </div>
+    );
+  }
 
   const metrics = [
-    { label: "Total Students", value: "1,248", detail: "+12 new this month" },
-    { label: "Active Teachers", value: "82", detail: "4 departments" },
-    { label: "Total Courses", value: "48", detail: "Across 6 grades" },
+    { label: "Total Students", value: counts.students.toString(), detail: "Active profiles in DB" },
+    { label: "Active Teachers", value: counts.teachers.toString(), detail: "Registered instructors" },
+    { label: "Total Courses", value: counts.courses.toString(), detail: "Configured classes" },
     { label: "Daily Attendance", value: "95.6%", detail: "Avg for today" },
   ];
 

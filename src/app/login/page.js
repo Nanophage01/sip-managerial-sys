@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
@@ -23,15 +23,30 @@ export default function LoginPage() {
 
     setIsLoading(true);
 
-    // Simple mock authentication delay
-    setTimeout(() => {
-      setIsLoading(false);
-      if (role === "admin") {
-        router.push("/admin/dashboard");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        if (data.user.role === "admin") {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/student/dashboard");
+        }
       } else {
-        router.push("/student/dashboard");
+        setError(data.error || "Authentication failed.");
       }
-    }, 800);
+    } catch (err) {
+      console.error("Login request error:", err);
+      setError("An error occurred connecting to the server.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -154,8 +169,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="text-center text-xs text-gray-400">
-            For demonstration, you can type any email and password.
+          <div className="text-center text-xs text-gray-500 border-t border-gray-100 pt-4 space-y-1">
+            <p className="font-semibold text-gray-700">Default Demo Credentials:</p>
+            <p>Admin: <span className="font-mono text-gray-800">admin@edumanage.com</span> / <span className="font-mono text-gray-800">admin123</span></p>
+            <p>Student: <span className="font-mono text-gray-800">student@edumanage.com</span> / <span className="font-mono text-gray-800">student123</span></p>
           </div>
         </div>
       </div>

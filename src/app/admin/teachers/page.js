@@ -1,28 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminTeachers() {
-  // Mock initial teacher data
-  const [teachers, setTeachers] = useState([
-    { id: "TC-001", name: "Dr. Elizabeth Vance", email: "evance@edumanage.com", department: "Mathematics", courses: "MATH-304, MATH-101" },
-    { id: "TC-002", name: "Mr. Arthur Pendelton", email: "apendelton@edumanage.com", department: "Science", courses: "CHEM-202, CHEM-101" },
-    { id: "TC-003", name: "Ms. Sarah Jenkins", email: "sjenkins@edumanage.com", department: "English", courses: "ENGL-102, ENGL-201" },
-    { id: "TC-004", name: "Mr. Gregory House", email: "ghouse@edumanage.com", department: "History", courses: "HIST-205, HIST-101" },
-    { id: "TC-005", name: "Dr. Gordon Freeman", email: "gfreeman@edumanage.com", department: "Science", courses: "PHYS-301" },
-    { id: "TC-006", name: "Dr. Alan Turing", email: "aturing@edumanage.com", department: "Computer Science", courses: "COMP-101, COMP-202" },
-  ]);
-
+  const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("add"); // "add" | "edit"
+  const [isLoading, setIsLoading] = useState(true);
   
   // Form States
-  const [currentTeacher, setCurrentTeacher] = useState({ id: "", name: "", email: "", department: "Mathematics", courses: "" });
+  const [currentTeacher, setCurrentTeacher] = useState({ teacherId: "", name: "", email: "", department: "Mathematics", courses: "" });
   const [formError, setFormError] = useState("");
 
+  // Fetch teachers on mount and search changes
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchTeachers();
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [search]);
+
+  async function fetchTeachers() {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`/api/teachers?search=${encodeURIComponent(search)}`);
+      const data = await res.json();
+      setTeachers(data || []);
+    } catch (err) {
+      console.error("Failed to fetch teachers list:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   const handleOpenAdd = () => {
-    setCurrentTeacher({ id: `TC-00${teachers.length + 1}`, name: "", email: "", department: "Mathematics", courses: "" });
+    const tempNum = Math.floor(100 + Math.random() * 900);
+    setCurrentTeacher({ teacherId: `TC-${tempNum}`, name: "", email: "", department: "Mathematics", courses: "" });
     setModalMode("add");
     setFormError("");
     setIsModalOpen(true);
@@ -35,13 +50,25 @@ export default function AdminTeachers() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (teacherId) => {
     if (confirm("Are you sure you want to delete this teacher record?")) {
-      setTeachers(teachers.filter((t) => t.id !== id));
+      try {
+        const res = await fetch(`/api/teachers/${teacherId}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          fetchTeachers();
+        } else {
+          const err = await res.json();
+          alert(`Delete failed: ${err.error}`);
+        }
+      } catch (err) {
+        console.error("Failed to delete teacher:", err);
+      }
     }
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setFormError("");
 
@@ -50,23 +77,34 @@ export default function AdminTeachers() {
       return;
     }
 
-    if (modalMode === "add") {
-      setTeachers([...teachers, currentTeacher]);
-    } else {
-      setTeachers(teachers.map((t) => (t.id === currentTeacher.id ? currentTeacher : t)));
+    try {
+      let res;
+      if (modalMode === "add") {
+        res = await fetch("/api/teachers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentTeacher),
+        });
+      } else {
+        res = await fetch(`/api/teachers/${currentTeacher.teacherId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentTeacher),
+        });
+      }
+
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchTeachers();
+      } else {
+        const err = await res.json();
+        setFormError(err.error || "Save operation failed.");
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      setFormError("Save failed due to network error.");
     }
-
-    setIsModalOpen(false);
   };
-
-  // Filter teachers based on search query
-  const filteredTeachers = teachers.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.email.toLowerCase().includes(search.toLowerCase()) ||
-      t.department.toLowerCase().includes(search.toLowerCase()) ||
-      t.id.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -111,16 +149,22 @@ export default function AdminTeachers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredTeachers.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-gray-400 italic">
+                    Loading teacher registry...
+                  </td>
+                </tr>
+              ) : teachers.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-gray-400 italic">
                     No teacher records found matching your query.
                   </td>
                 </tr>
               ) : (
-                filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-gray-50/20">
-                    <td className="px-6 py-4 font-bold text-gray-900">{teacher.id}</td>
+                teachers.map((teacher) => (
+                  <tr key={teacher.teacherId} className="hover:bg-gray-50/20">
+                    <td className="px-6 py-4 font-bold text-gray-900">{teacher.teacherId}</td>
                     <td className="px-6 py-4 font-medium text-gray-800">{teacher.name}</td>
                     <td className="px-6 py-4 text-gray-500">{teacher.email}</td>
                     <td className="px-6 py-4 font-medium text-gray-700">{teacher.department}</td>
@@ -146,7 +190,7 @@ export default function AdminTeachers() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(teacher.id)}
+                        onClick={() => handleDelete(teacher.teacherId)}
                         className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
                       >
                         Delete
@@ -163,7 +207,7 @@ export default function AdminTeachers() {
       {/* CRUD Modal dialog */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white border border-gray-200 rounded-lg max-w-md w-full shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white border border-gray-200 rounded-lg max-w-md w-full shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50">
               <h2 className="font-bold text-gray-900">{modalMode === "add" ? "Register New Teacher" : "Edit Teacher Profile"}</h2>
               <button
@@ -186,7 +230,7 @@ export default function AdminTeachers() {
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Teacher ID</label>
                 <input
                   type="text"
-                  value={currentTeacher.id}
+                  value={currentTeacher.teacherId}
                   disabled
                   className="block w-full rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 outline-none"
                 />

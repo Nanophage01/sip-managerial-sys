@@ -1,21 +1,46 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function StudentLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        } else {
+          router.push("/login");
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+      }
+    }
+    fetchUser();
+  }, [router]);
 
   const navigation = [
-    { name: "Dashboard", href: "/student/dashboard", icon: "HomeIcon" },
-    { name: "My Courses", href: "/student/courses", icon: "BookOpenIcon" },
-    { name: "Schedule", href: "/student/schedule", icon: "CalendarIcon" },
-    { name: "Grades & Reports", href: "/student/grades", icon: "AcademicCapIcon" },
+    { name: "Dashboard", href: "/student/dashboard" },
+    { name: "My Courses", href: "/student/courses" },
+    { name: "Schedule", href: "/student/schedule" },
+    { name: "Grades & Reports", href: "/student/grades" },
   ];
 
-  const handleLogout = () => {
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      router.push("/login");
+    }
   };
 
   return (
@@ -67,7 +92,6 @@ export default function StudentLayout({ children }) {
         {/* Header */}
         <header className="flex h-16 items-center justify-between px-6 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-4 md:hidden">
-            {/* Mobile Brand */}
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-white text-xs font-bold">
                 EM
@@ -79,10 +103,9 @@ export default function StudentLayout({ children }) {
           </div>
 
           <div className="hidden md:block text-sm text-gray-500">
-            Welcome back, <span className="font-semibold text-gray-800">Jane Doe</span> (Student ID: #ST-202604)
+            Welcome back, <span className="font-semibold text-gray-800">{user ? user.name : "Student"}</span> {user?.studentId ? `(Student ID: #${user.studentId})` : ""}
           </div>
 
-          {/* Mobile navigation toggle placeholder or quick actions */}
           <div className="flex items-center gap-4">
             <div className="text-sm font-medium text-gray-700 bg-gray-100 px-3 py-1 rounded">
               Grade 11-A

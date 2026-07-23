@@ -1,28 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminStudents() {
-  // Mock initial student data
-  const [students, setStudents] = useState([
-    { id: "ST-202601", name: "Bobby Tables", email: "bobby@edumanage.com", grade: "11-A", status: "Enrolled" },
-    { id: "ST-202602", name: "Alice Cooper", email: "alice@edumanage.com", grade: "10-B", status: "Enrolled" },
-    { id: "ST-202603", name: "David Hasselhoff", email: "david@edumanage.com", grade: "12-C", status: "Suspended" },
-    { id: "ST-202604", name: "Jane Doe", email: "student@edumanage.com", grade: "11-A", status: "Enrolled" },
-    { id: "ST-202605", name: "John Smith", email: "john@edumanage.com", grade: "9-A", status: "Enrolled" },
-    { id: "ST-202606", name: "Grace Hopper", email: "grace@edumanage.com", grade: "12-A", status: "Graduated" },
-  ]);
-
+  const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("add"); // "add" | "edit"
+  const [isLoading, setIsLoading] = useState(true);
   
   // Form States
-  const [currentStudent, setCurrentStudent] = useState({ id: "", name: "", email: "", grade: "11-A", status: "Enrolled" });
+  const [currentStudent, setCurrentStudent] = useState({ studentId: "", name: "", email: "", grade: "11-A", status: "Enrolled" });
   const [formError, setFormError] = useState("");
 
+  // Fetch students on mount and search changes
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      fetchStudents();
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [search]);
+
+  async function fetchStudents() {
+    try {
+      setIsLoading(true);
+      const res = await fetch(`/api/students?search=${encodeURIComponent(search)}`);
+      const data = await res.json();
+      setStudents(data || []);
+    } catch (err) {
+      console.error("Failed to fetch students list:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   const handleOpenAdd = () => {
-    setCurrentStudent({ id: `ST-20260${students.length + 1}`, name: "", email: "", grade: "11-A", status: "Enrolled" });
+    // Generate a temporary unique ID for reference
+    const tempNum = Math.floor(1000 + Math.random() * 9000);
+    setCurrentStudent({ studentId: `ST-2026${tempNum}`, name: "", email: "", grade: "11-A", status: "Enrolled" });
     setModalMode("add");
     setFormError("");
     setIsModalOpen(true);
@@ -35,13 +51,25 @@ export default function AdminStudents() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (studentId) => {
     if (confirm("Are you sure you want to delete this student record?")) {
-      setStudents(students.filter((s) => s.id !== id));
+      try {
+        const res = await fetch(`/api/students/${studentId}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          fetchStudents();
+        } else {
+          const err = await res.json();
+          alert(`Delete failed: ${err.error}`);
+        }
+      } catch (err) {
+        console.error("Failed to delete student:", err);
+      }
     }
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setFormError("");
 
@@ -50,23 +78,34 @@ export default function AdminStudents() {
       return;
     }
 
-    if (modalMode === "add") {
-      // Check if student with same ID already exists (should not happen with our mock auto-inc)
-      setStudents([...students, currentStudent]);
-    } else {
-      setStudents(students.map((s) => (s.id === currentStudent.id ? currentStudent : s)));
+    try {
+      let res;
+      if (modalMode === "add") {
+        res = await fetch("/api/students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentStudent),
+        });
+      } else {
+        res = await fetch(`/api/students/${currentStudent.studentId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(currentStudent),
+        });
+      }
+
+      if (res.ok) {
+        setIsModalOpen(false);
+        fetchStudents();
+      } else {
+        const err = await res.json();
+        setFormError(err.error || "Save operation failed.");
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+      setFormError("Save failed due to network error.");
     }
-
-    setIsModalOpen(false);
   };
-
-  // Filter students based on search query
-  const filteredStudents = students.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase()) ||
-      s.id.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-6">
@@ -111,16 +150,22 @@ export default function AdminStudents() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredStudents.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-gray-400 italic">
+                    Loading student directory...
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="px-6 py-8 text-center text-gray-400 italic">
                     No student records found matching your query.
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50/20">
-                    <td className="px-6 py-4 font-bold text-gray-900">{student.id}</td>
+                students.map((student) => (
+                  <tr key={student.studentId} className="hover:bg-gray-50/20">
+                    <td className="px-6 py-4 font-bold text-gray-900">{student.studentId}</td>
                     <td className="px-6 py-4 font-medium text-gray-800">{student.name}</td>
                     <td className="px-6 py-4 text-gray-500">{student.email}</td>
                     <td className="px-6 py-4 font-medium text-gray-700">{student.grade}</td>
@@ -145,7 +190,7 @@ export default function AdminStudents() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(student.id)}
+                        onClick={() => handleDelete(student.studentId)}
                         className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
                       >
                         Delete
@@ -162,7 +207,7 @@ export default function AdminStudents() {
       {/* CRUD Modal dialog */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white border border-gray-200 rounded-lg max-w-md w-full shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white border border-gray-200 rounded-lg max-w-md w-full shadow-lg overflow-hidden">
             <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50">
               <h2 className="font-bold text-gray-900">{modalMode === "add" ? "Add Student Profile" : "Edit Student Profile"}</h2>
               <button
@@ -185,7 +230,7 @@ export default function AdminStudents() {
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Student ID</label>
                 <input
                   type="text"
-                  value={currentStudent.id}
+                  value={currentStudent.studentId}
                   disabled
                   className="block w-full rounded border border-gray-300 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 outline-none"
                 />

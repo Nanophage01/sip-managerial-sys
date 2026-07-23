@@ -1,11 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        } else {
+          router.push("/login");
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+      }
+    }
+    fetchUser();
+  }, [router]);
 
   const navigation = [
     { name: "Dashboard", href: "/admin/dashboard" },
@@ -15,8 +34,14 @@ export default function AdminLayout({ children }) {
     { name: "Attendance", href: "/admin/attendance" },
   ];
 
-  const handleLogout = () => {
-    router.push("/login");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      router.push("/login");
+    }
   };
 
   return (
@@ -58,7 +83,7 @@ export default function AdminLayout({ children }) {
 
         <div className="p-4 border-t border-gray-200">
           <div className="mb-4 px-3 text-xs text-gray-400 font-medium">
-            Signed in as Admin
+            Signed in as {user ? user.name : "Admin"}
           </div>
           <button
             onClick={handleLogout}
@@ -74,7 +99,6 @@ export default function AdminLayout({ children }) {
         {/* Header */}
         <header className="flex h-16 items-center justify-between px-6 border-b border-gray-200 bg-white">
           <div className="flex items-center gap-4 md:hidden">
-            {/* Mobile Brand */}
             <div className="flex items-center gap-2">
               <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-white text-xs font-bold">
                 EM
@@ -86,7 +110,7 @@ export default function AdminLayout({ children }) {
           </div>
 
           <div className="hidden md:block text-sm text-gray-500">
-            Welcome back, <span className="font-semibold text-gray-800">System Administrator</span>
+            Welcome back, <span className="font-semibold text-gray-800">{user ? user.name : "System Administrator"}</span>
           </div>
 
           <div className="flex items-center gap-4">

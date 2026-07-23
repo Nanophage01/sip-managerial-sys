@@ -1,51 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminAttendance() {
-  const coursesList = [
-    { code: "MATH-304", name: "Advanced Mathematics", time: "08:30 AM", attendance: "95%" },
-    { code: "CHEM-202", name: "Chemistry & Lab", time: "10:00 AM", attendance: "94%" },
-    { code: "ENGL-102", name: "English Literature", time: "11:30 AM", attendance: "96%" },
-    { code: "HIST-205", name: "World History", time: "01:45 PM", attendance: "92%" },
-    { code: "PHYS-301", name: "Introductory Physics", time: "09:00 AM", attendance: "97%" },
-    { code: "COMP-101", name: "Computer Science I", time: "01:00 PM", attendance: "98%" },
-  ];
-
-  const mockStudents = [
-    { id: "ST-202601", name: "Bobby Tables", status: "Present" },
-    { id: "ST-202602", name: "Alice Cooper", status: "Present" },
-    { id: "ST-202604", name: "Jane Doe", status: "Present" },
-    { id: "ST-202605", name: "John Smith", status: "Late" },
-    { id: "ST-202607", name: "Ada Lovelace", status: "Absent" },
-  ];
-
+  const [coursesList, setCoursesList] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState("");
-  const [studentsAttendance, setStudentsAttendance] = useState(mockStudents);
+  const [studentsAttendance, setStudentsAttendance] = useState([]);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(true);
+  const [isLoadingSheet, setIsLoadingSheet] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleOpenAttendanceSheet = (code) => {
+  useEffect(() => {
+    async function fetchCourses() {
+      try {
+        const res = await fetch("/api/courses");
+        const data = await res.json();
+        setCoursesList(data || []);
+      } catch (err) {
+        console.error("Failed to fetch courses:", err);
+      } finally {
+        setIsLoadingCourses(false);
+      }
+    }
+    fetchCourses();
+  }, []);
+
+  const handleOpenAttendanceSheet = async (code) => {
     setSelectedCourse(code);
-    setStudentsAttendance(
-      mockStudents.map((s) => ({
-        ...s,
-        // randomize some default selections just to make it dynamic
-        status: Math.random() > 0.8 ? "Absent" : Math.random() > 0.85 ? "Late" : "Present",
-      }))
-    );
+    setIsLoadingSheet(true);
     setSuccessMsg("");
+
+    try {
+      const dateStr = new Date().toISOString().split("T")[0];
+      const res = await fetch(`/api/attendance?courseCode=${code}&date=${dateStr}`);
+      const data = await res.json();
+      setStudentsAttendance(data.records || []);
+    } catch (err) {
+      console.error("Failed to fetch attendance sheet:", err);
+    } finally {
+      setIsLoadingSheet(false);
+    }
   };
 
-  const handleStatusChange = (id, newStatus) => {
+  const handleStatusChange = (studentId, newStatus) => {
     setStudentsAttendance(
-      studentsAttendance.map((s) => (s.id === id ? { ...s, status: newStatus } : s))
+      studentsAttendance.map((s) => (s.studentId === studentId ? { ...s, status: newStatus } : s))
     );
   };
 
-  const handleSaveAttendance = (e) => {
+  const handleSaveAttendance = async (e) => {
     e.preventDefault();
-    setSuccessMsg(`Daily attendance sheet for ${selectedCourse} has been saved successfully!`);
-    setTimeout(() => setSuccessMsg(""), 3500);
+    setSuccessMsg("");
+
+    try {
+      const dateStr = new Date().toISOString().split("T")[0];
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseCode: selectedCourse,
+          date: dateStr,
+          records: studentsAttendance,
+        }),
+      });
+
+      if (res.ok) {
+        setSuccessMsg(`Daily attendance log for ${selectedCourse} has been saved to MongoDB!`);
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        const err = await res.json();
+        alert(`Save failed: ${err.error}`);
+      }
+    } catch (err) {
+      console.error("Failed to save attendance:", err);
+    }
   };
 
   return (
@@ -59,27 +87,33 @@ export default function AdminAttendance() {
         {/* Attendance Dashboard List */}
         <div className="md:col-span-1 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden h-fit">
           <div className="border-b border-gray-200 px-5 py-4 bg-gray-50">
-            <h2 className="font-semibold text-gray-900 text-xs uppercase tracking-wider text-gray-500">Today's Class Registers</h2>
+            <h2 className="font-semibold text-xs uppercase tracking-wider text-gray-500">Today's Class Registers</h2>
           </div>
           <div className="divide-y divide-gray-100 p-2">
-            {coursesList.map((c) => (
-              <button
-                key={c.code}
-                onClick={() => handleOpenAttendanceSheet(c.code)}
-                className={`w-full text-left p-3 rounded transition-colors flex justify-between items-center text-xs ${
-                  selectedCourse === c.code ? "bg-blue-50/50 border border-blue-200" : "hover:bg-gray-50"
-                }`}
-              >
-                <div>
-                  <span className="font-bold text-gray-900 block">{c.code}</span>
-                  <span className="text-gray-400 mt-0.5 block">{c.time}</span>
-                </div>
-                <div className="text-right">
-                  <span className="font-semibold text-primary block">{c.attendance}</span>
-                  <span className="text-[10px] text-gray-500 mt-0.5 block">Record Daily</span>
-                </div>
-              </button>
-            ))}
+            {isLoadingCourses ? (
+              <div className="p-4 text-center text-xs text-gray-400">Loading courses...</div>
+            ) : coursesList.length === 0 ? (
+              <div className="p-4 text-center text-xs text-gray-400">No active classes</div>
+            ) : (
+              coursesList.map((c) => (
+                <button
+                  key={c.code}
+                  onClick={() => handleOpenAttendanceSheet(c.code)}
+                  className={`w-full text-left p-3 rounded transition-colors flex justify-between items-center text-xs ${
+                    selectedCourse === c.code ? "bg-blue-50/50 border border-blue-200" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <div>
+                    <span className="font-bold text-gray-900 block">{c.code}</span>
+                    <span className="text-gray-400 mt-0.5 block">{c.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-semibold text-primary block">Record</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5 block">Roll Call</span>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -97,64 +131,78 @@ export default function AdminAttendance() {
                 <span className="text-xs text-gray-400 font-medium">Date: {new Date().toLocaleDateString()}</span>
               </div>
 
-              <form onSubmit={handleSaveAttendance} className="p-6">
-                {successMsg && (
-                  <div className="mb-4 p-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded">
-                    {successMsg}
-                  </div>
-                )}
+              {isLoadingSheet ? (
+                <div className="p-12 text-center text-xs text-gray-400">
+                  Loading attendance roster...
+                </div>
+              ) : (
+                <form onSubmit={handleSaveAttendance} className="p-6">
+                  {successMsg && (
+                    <div className="mb-4 p-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded">
+                      {successMsg}
+                    </div>
+                  )}
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse mb-6">
-                    <thead>
-                      <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/50">
-                        <th className="px-4 py-3">Student ID</th>
-                        <th className="px-4 py-3">Student Name</th>
-                        <th className="px-4 py-3 text-right">Attendance Roll</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {studentsAttendance.map((student) => (
-                        <tr key={student.id} className="hover:bg-gray-50/10">
-                          <td className="px-4 py-3 font-bold text-gray-900">{student.id}</td>
-                          <td className="px-4 py-3 font-medium text-gray-800">{student.name}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="inline-flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
-                              {["Present", "Absent", "Late"].map((opt) => (
-                                <button
-                                  key={opt}
-                                  type="button"
-                                  onClick={() => handleStatusChange(student.id, opt)}
-                                  className={`px-3 py-1 rounded text-[10px] font-semibold transition-colors ${
-                                    student.status === opt
-                                      ? opt === "Present"
-                                        ? "bg-green-600 text-white shadow-sm"
-                                        : opt === "Absent"
-                                        ? "bg-red-600 text-white shadow-sm"
-                                        : "bg-yellow-500 text-white shadow-sm"
-                                      : "text-gray-600 hover:text-gray-900"
-                                  }`}
-                                >
-                                  {opt}
-                                </button>
-                              ))}
-                            </div>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse mb-6">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/50">
+                          <th className="px-4 py-3">Student ID</th>
+                          <th className="px-4 py-3">Student Name</th>
+                          <th className="px-4 py-3 text-right">Attendance Roll</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {studentsAttendance.length === 0 ? (
+                          <tr>
+                            <td colSpan="3" className="px-4 py-6 text-center text-gray-400">
+                              No students registered in directory.
+                            </td>
+                          </tr>
+                        ) : (
+                          studentsAttendance.map((student) => (
+                            <tr key={student.studentId} className="hover:bg-gray-50/10">
+                              <td className="px-4 py-3 font-bold text-gray-900">{student.studentId}</td>
+                              <td className="px-4 py-3 font-medium text-gray-800">{student.name}</td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="inline-flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
+                                  {["Present", "Absent", "Late"].map((opt) => (
+                                    <button
+                                      key={opt}
+                                      type="button"
+                                      onClick={() => handleStatusChange(student.studentId, opt)}
+                                      className={`px-3 py-1 rounded text-[10px] font-semibold transition-colors ${
+                                        student.status === opt
+                                          ? opt === "Present"
+                                            ? "bg-green-600 text-white shadow-sm"
+                                            : opt === "Absent"
+                                            ? "bg-red-600 text-white shadow-sm"
+                                            : "bg-yellow-500 text-white shadow-sm"
+                                          : "text-gray-600 hover:text-gray-900"
+                                      }`}
+                                    >
+                                      {opt}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
 
-                <div className="flex justify-end border-t border-gray-100 pt-4">
-                  <button
-                    type="submit"
-                    className="rounded bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-light transition-colors"
-                  >
-                    Save Attendance Log
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end border-t border-gray-100 pt-4">
+                    <button
+                      type="submit"
+                      className="rounded bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-light transition-colors"
+                    >
+                      Save Attendance Log
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           ) : (
             <div className="bg-white border border-gray-200 border-dashed rounded-lg p-12 text-center text-gray-400">

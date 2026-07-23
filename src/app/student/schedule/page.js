@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function StudentSchedule() {
+  const [courses, setCourses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const timeSlots = [
     "08:30 AM - 09:45 AM",
     "10:00 AM - 11:15 AM",
@@ -13,32 +16,73 @@ export default function StudentSchedule() {
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
-  // Mock schedule data mapping [day][timeSlotIndex]
+  useEffect(() => {
+    async function fetchCourses() {
+      try {
+        const res = await fetch("/api/courses");
+        const data = await res.json();
+        setCourses(data);
+      } catch (err) {
+        console.error("Failed to fetch schedule courses:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCourses();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm font-medium text-gray-500">
+        Loading schedule...
+      </div>
+    );
+  }
+
+  // Parse courses database data and fit it into our day-timeslot structure
   const scheduleData = {
-    Monday: {
-      0: { name: "Advanced Mathematics", code: "MATH-304", room: "Room 304" },
-      1: { name: "Chemistry & Lab", code: "CHEM-202", room: "Lab B" },
-      3: { name: "Study Hall / Advisor Meet", code: "STUDY-1", room: "Library" },
-    },
-    Tuesday: {
-      1: { name: "Introductory Physics", code: "PHYS-301", room: "Lab C" },
-      2: { name: "English Literature", code: "ENGL-102", room: "Room 102" },
-      4: { name: "World History", code: "HIST-205", room: "Room 205" },
-    },
-    Wednesday: {
-      0: { name: "Advanced Mathematics", code: "MATH-304", room: "Room 304" },
-      1: { name: "Chemistry & Lab", code: "CHEM-202", room: "Lab B" },
-    },
-    Thursday: {
-      2: { name: "English Literature", code: "ENGL-102", room: "Room 102" },
-      4: { name: "World History", code: "HIST-205", room: "Room 205" },
-    },
-    Friday: {
-      0: { name: "Computer Science I", code: "COMP-101", room: "Computer Lab 1" },
-      1: { name: "Computer Science I", code: "COMP-101", room: "Computer Lab 1" },
-      3: { name: "Physical Education", code: "PE-100", room: "Gymnasium" },
-    },
+    Monday: {},
+    Tuesday: {},
+    Wednesday: {},
+    Thursday: {},
+    Friday: {},
   };
+
+  courses.forEach((course) => {
+    const sched = course.schedule.toLowerCase();
+    
+    // Find time index based on course timing
+    let timeIdx = -1;
+    if (sched.includes("08:30")) timeIdx = 0;
+    else if (sched.includes("10:00")) timeIdx = 1;
+    else if (sched.includes("11:30")) timeIdx = 2;
+    else if (sched.includes("01:00") || sched.includes("13:00") || sched.includes("1:00")) timeIdx = 3;
+    else if (sched.includes("02:30") || sched.includes("14:30") || sched.includes("2:30")) timeIdx = 4;
+    
+    // If no match found, assign to slot based on array order
+    if (timeIdx === -1) {
+      if (sched.includes("09:00")) timeIdx = 0;
+      else if (sched.includes("01:45") || sched.includes("13:45")) timeIdx = 4;
+    }
+
+    if (timeIdx !== -1) {
+      if (sched.includes("mon") || sched.includes("monday")) {
+        scheduleData.Monday[timeIdx] = { name: course.name, code: course.code, room: course.room };
+      }
+      if (sched.includes("tue") || sched.includes("tuesday")) {
+        scheduleData.Tuesday[timeIdx] = { name: course.name, code: course.code, room: course.room };
+      }
+      if (sched.includes("wed") || sched.includes("wednesday")) {
+        scheduleData.Wednesday[timeIdx] = { name: course.name, code: course.code, room: course.room };
+      }
+      if (sched.includes("thu") || sched.includes("thursday")) {
+        scheduleData.Thursday[timeIdx] = { name: course.name, code: course.code, room: course.room };
+      }
+      if (sched.includes("fri") || sched.includes("friday")) {
+        scheduleData.Friday[timeIdx] = { name: course.name, code: course.code, room: course.room };
+      }
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -95,7 +139,7 @@ export default function StudentSchedule() {
           </table>
         </div>
 
-        {/* Mobile/Tablet List Schedule (Accordion or Timeline view) */}
+        {/* Mobile/Tablet List Schedule */}
         <div className="lg:hidden p-4 space-y-6">
           {days.map((day) => {
             const dayClasses = scheduleData[day] || {};
