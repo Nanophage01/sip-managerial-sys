@@ -1,26 +1,29 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: #ffffff;
+  --color-foreground: #1e293b;
+  --color-primary: #1e3a5f;
+  --color-primary-light: #2d5a87;
+  --color-primary-dark: #0f2440;
+  --color-secondary: #f8fafc;
+  --color-accent: #e2e8f0;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: #ffffff;
+  color: #1e293b;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Log sliding animation - moves left and right through the ring */
+@keyframes sawLog {
+  0% {
+    transform: translateX(-180px);
+  }
+  100% {
+    transform: translateX(180px);
+  }
 }
